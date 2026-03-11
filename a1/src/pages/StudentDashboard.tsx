@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dataStore } from '../store/dataStore';
 import type { QuestionPaper, PaperSnapshot } from '../types';
+import { exportPDFFromElement } from '../utils/pdfExport';
 import '../styles/pages.css';
 
 export const StudentDashboard: React.FC = () => {
@@ -26,6 +27,13 @@ export const StudentDashboard: React.FC = () => {
     window.print();
   };
 
+  const handleDownloadPDF = () => {
+    if (selectedPaper) {
+      const filename = `${selectedPaper.title.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
+      exportPDFFromElement('paper-content', filename);
+    }
+  };
+
   if (selectedPaper) {
     return (
       <div className="dashboard">
@@ -35,8 +43,11 @@ export const StudentDashboard: React.FC = () => {
             <button onClick={() => setSelectedPaper(null)} className="btn-secondary">
               Back
             </button>
-            <button onClick={handlePrint} className="btn-primary">
-              Print
+            <button onClick={handleDownloadPDF} className="btn-primary">
+              📥 Download PDF
+            </button>
+            <button onClick={handlePrint} className="btn-secondary">
+              🖨️ Print
             </button>
             <button onClick={handleLogout} className="btn-secondary">
               Logout
@@ -44,7 +55,7 @@ export const StudentDashboard: React.FC = () => {
           </div>
         </header>
 
-        <div className="paper-container">
+        <div id="paper-content" className="paper-container">
           <div className="paper-header">
             <h2>{selectedPaper.title}</h2>
             <p>Subject: {subjects.find((s) => s.id === selectedPaper.subjectId)?.name}</p>

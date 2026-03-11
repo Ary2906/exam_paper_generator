@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dataStore } from '../store/dataStore';
 import type { Question, QuestionPaper } from '../types';
+import { exportPDFFromElement } from '../utils/pdfExport';
 import { PaperEditor } from '../components/PaperEditor';
 import '../styles/pages.css';
 
@@ -103,6 +104,64 @@ export const ExaminerDashboard: React.FC = () => {
   const handleSavePaper = () => {
     setPapers([...dataStore.getPapersByExaminer(currentUser!.id)]);
     handleClosePaperEditor();
+  };
+
+  const handleExportPaperPDF = (paper: QuestionPaper) => {
+    const snapshots = dataStore.getSnapshotsByPaper(paper.id);
+    if (snapshots.length === 0) {
+      alert('No questions in this paper');
+      return;
+    }
+
+    const tempElementId = `paper-export-${Date.now()}`;
+    const container = document.createElement('div');
+    container.id = tempElementId;
+    container.style.display = 'none';
+
+    const subject = subjects.find((s) => s.id === paper.subjectId);
+
+    // Build content using DOM methods (more efficient than string concatenation)
+    container.innerHTML = `
+      <div style="padding: 20px; font-family: Arial, sans-serif;">
+        <h2 style="text-align: center;">${paper.title}</h2>
+        <p style="text-align: center;"><strong>Subject:</strong> ${subject?.name || 'N/A'}</p>
+        <p style="text-align: center;"><strong>Marks:</strong> ${paper.totalMarks}</p>
+        <p style="text-align: center;"><strong>Date:</strong> ${new Date(paper.createdAt).toLocaleDateString()}</p>
+        <hr style="margin: 20px 0;"><h3>Questions</h3>
+    `;
+
+    // Add questions
+    const questionsSection = document.createElement('div');
+    snapshots.forEach((snapshot, idx) => {
+      const q = document.createElement('div');
+      q.style.marginBottom = '20px';
+      q.innerHTML = `
+        <p><strong>Q${idx + 1}. ${snapshot.snapshotText}</strong></p>
+        ${snapshot.snapshotOptions?.length ? `<ol type="a" style="margin: 10px 0;">${snapshot.snapshotOptions.map(opt => `<li>${opt}</li>`).join('')}</ol>` : ''}
+        <p style="margin: 10px 0;"><strong>Marks:</strong> ${snapshot.marks}</p>
+      `;
+      questionsSection.appendChild(q);
+    });
+    container.appendChild(questionsSection);
+
+    // Add answer key
+    const answerSection = document.createElement('div');
+    answerSection.innerHTML = '<hr style="margin: 20px 0;"><h3>Answer Key</h3>';
+    snapshots.forEach((snapshot, idx) => {
+      const answer = document.createElement('div');
+      answer.style.marginBottom = '15px';
+      answer.innerHTML = `<p><strong>Q${idx + 1}:</strong> ${snapshot.snapshotCorrectAnswer}${snapshot.snapshotExplanation ? `<br/><em style="color: #666;">Explanation: ${snapshot.snapshotExplanation}</em>` : ''}</p>`;
+      answerSection.appendChild(answer);
+    });
+    container.appendChild(answerSection);
+
+    document.body.appendChild(container);
+
+    const filename = `${paper.title.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
+    exportPDFFromElement(tempElementId, filename);
+
+    // Cleanup
+    setTimeout(() => document.body.removeChild(container), 1000);
   };
 
   const handleLogout = () => {
@@ -408,6 +467,13 @@ export const ExaminerDashboard: React.FC = () => {
                     </td>
                     <td>{new Date(p.createdAt).toLocaleDateString()}</td>
                     <td>
+                      <button
+                        onClick={() => handleExportPaperPDF(p)}
+                        className="btn-secondary"
+                        title="Export as PDF"
+                      >
+                        📥 PDF
+                      </button>
                       <button
                         onClick={() => handleEditPaper(p)}
                         className="btn-info"
